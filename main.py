@@ -5,6 +5,7 @@ import os
 import streamlit as st
 from google import genai
 import pandas as pd
+from ast import literal_eval
 
 # Configuração da página
 st.set_page_config(
@@ -61,7 +62,7 @@ def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
         if response.text:
             # Extrai o dicionário da resposta
             dict_str = response.text.strip().replace('```python', '').replace('```', '').strip()
-            return dict_str
+            return literal_eval(dict_str)
     except Exception as e:
         st.error(f"Erro ao gerar recomendações: {str(e)}")
         # Retorno padrão em caso de erro

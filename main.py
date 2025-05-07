@@ -57,7 +57,7 @@ def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
     try:
         response = client.models.generate_content(
                         model="gemini-2.0-flash",
-                        contents=[prompt]).txt
+                        contents=[prompt])
         if response.text:
             # Extrai o dicionário da resposta
             dict_str = response.text.strip().replace('```python', '').replace('```', '').strip()

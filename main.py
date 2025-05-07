@@ -23,7 +23,7 @@ st.markdown("""
 # Configuração do Gemini
 gemini_api_key = os.getenv("GEM_API_KEY")
 client = genai.Client(api_key=gemini_api_key)
-
+model = "gemini-1.5-flash"
 # Função para gerar recomendações de volumetria
 def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
     prompt = f"""

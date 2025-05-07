@@ -30,7 +30,7 @@ def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
     Com base nas seguintes informações do projeto:
     - Tipo: {tipo_projeto}
     - Nível de complexidade: {complexidade}
-    - Funcionalidades principais: {funcionalidades}
+    - Funcionalidades principais: {', '.join(funcionalidades) if funcionalidades else 'Nenhuma especificada'}
 
     Gere recomendações realistas de volumetria (horas/projetos) para cada item de um orçamento de desenvolvimento de site, considerando os seguintes itens:
     1. Desenvolvimento (horas)
@@ -49,23 +49,23 @@ def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
     }}
 
     Seja realista e considere que:
-    - Standard é o pacote básico
-    - Plus inclui mais funcionalidades
-    - Pro é o pacote completo
+    - Standard é o pacote básico (40-60 horas desenvolvimento)
+    - Plus inclui mais funcionalidades (60-80 horas)
+    - Pro é o pacote completo (80-120 horas)
     """
     
-    response = client.generate_text(prompt=prompt)
     try:
-        # Extrai o dicionário da resposta
-        start_idx = response.text.find('{')
-        end_idx = response.text.rfind('}') + 1
-        dict_str = response.text[start_idx:end_idx]
-        return eval(dict_str)
-    except:
+        response = model.generate_content(prompt)
+        if response.text:
+            # Extrai o dicionário da resposta
+            dict_str = response.text.strip().replace('```python', '').replace('```', '').strip()
+            return literal_eval(dict_str)
+    except Exception as e:
+        st.error(f"Erro ao gerar recomendações: {str(e)}")
         # Retorno padrão em caso de erro
         return {
-            "Desenvolvimento": [60, 80, 80],
-            "Layout / Conteúdo": [70, 100, 100],
+            "Desenvolvimento": [60, 80, 100],
+            "Layout / Conteúdo": [40, 60, 80],
             "BigQuery": [0, 0, 1],
             "Projeto de governança": [0, 1, 1],
             "Modo/Banner de Consentimento": [1, 1, 1]

@@ -61,7 +61,7 @@ def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
         if response.text:
             # Extrai o dicionário da resposta
             dict_str = response.text.strip().replace('```python', '').replace('```', '').strip()
-            return literal_eval(dict_str)
+            return dict_str
     except Exception as e:
         st.error(f"Erro ao gerar recomendações: {str(e)}")
         # Retorno padrão em caso de erro

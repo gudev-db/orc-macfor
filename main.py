@@ -3,9 +3,8 @@ import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import os
 import streamlit as st
-from google import genai
 import pandas as pd
-from ast import literal_eval
+from io import BytesIO
 
 # Configuração da página
 st.set_page_config(
@@ -21,81 +20,81 @@ st.markdown("""
     Preencha os campos abaixo para gerar orçamentos detalhados para diferentes pacotes de desenvolvimento de sites.
 """)
 
-# Configuração do Gemini
-gemini_api_key = os.getenv("GEM_API_KEY")
-client = genai.Client(api_key=gemini_api_key)
-model = "gemini-1.5-flash"
-# Função para gerar recomendações de volumetria
-def gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades):
-    prompt = f"""
-    Com base nas seguintes informações do projeto:
-    - Tipo: {tipo_projeto}
-    - Nível de complexidade: {complexidade}
-    - Funcionalidades principais: {', '.join(funcionalidades) if funcionalidades else 'Nenhuma especificada'}
+# Dados fixos baseados na tabela fornecida
+SERVICOS_POR_PLANO = {
+    "Standard": [
+        {"Serviços": "Layout", "MEDIDA": "horas", "CUSTO UN": 50.00, "PREÇO UNITÁRIO": 170.00, "VOLUMETRIA": 64},
+        {"Serviços": "Desenvolvimento", "MEDIDA": "horas", "CUSTO UN": 187.50, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 64},
+        {"Serviços": "Configuração e implementação do Modo/Banner de Consentimento", "MEDIDA": "Projeto", "CUSTO UN": 1875.00, "PREÇO UNITÁRIO": 3000.00, "VOLUMETRIA": 1},
+        {"Serviços": "Hospedagem", "MEDIDA": "Anual", "CUSTO UN": 100.00, "PREÇO UNITÁRIO": 130.00, "VOLUMETRIA": 0},
+        {"Serviços": "Plugin - ElementorPro", "MEDIDA": "Anual", "CUSTO UN": 39.90, "PREÇO UNITÁRIO": 51.87, "VOLUMETRIA": 1},
+        {"Serviços": "Gestão do Projeto Sr", "MEDIDA": "horas", "CUSTO UN": 0, "PREÇO UNITÁRIO": 320.00, "VOLUMETRIA": 30},
+        {"Serviços": "Reuniões", "MEDIDA": "horas", "CUSTO UN": 0, "PREÇO UNITÁRIO": 268.50, "VOLUMETRIA": 30},
+        {"Serviços": "Domínio (1 ano)", "MEDIDA": "Anual", "CUSTO UN": 40.00, "PREÇO UNITÁRIO": 52.00, "VOLUMETRIA": 1}
+    ],
+    "Plus": [
+        {"Serviços": "SEO Planejamento", "MEDIDA": "Projeto", "CUSTO UN": 0, "PREÇO UNITÁRIO": 18578.72, "VOLUMETRIA": 1},
+        {"Serviços": "SEO Implementação (Desenvolvimento TECH PLAN)", "MEDIDA": "horas", "CUSTO UN": 150.00, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 0}
+    ],
+    "Pro": [
+        {"Serviços": "Projeto de governança Digital", "MEDIDA": "Projeto", "CUSTO UN": 0, "PREÇO UNITÁRIO": 19646.56, "VOLUMETRIA": 1},
+        {"Serviços": "BigQuery (Incluido no custo do proj. de Gov. Digital)", "MEDIDA": "Projeto", "CUSTO UN": 600.00, "PREÇO UNITÁRIO": 1200.00, "VOLUMETRIA": 0}
+    ]
+}
 
-    Gere recomendações realistas de volumetria (horas/projetos) para cada item de um orçamento de desenvolvimento de site, considerando os seguintes itens:
-    1. Desenvolvimento (horas)
-    2. Layout/Conteúdo (horas)
-    3. BigQuery (projeto - 0 ou 1)
-    4. Projeto de governança (projeto - 0 ou 1)
-    5. Configuração do Modo/Banner de Consentimento (projeto - 0 ou 1)
+# Serviços extras e manutenções (se necessário)
+SERVICOS_EXTRAS = {
+    "Extras": [
+        {"Serviços": "Dashboard", "MEDIDA": "Projeto", "CUSTO UN": 8000.00, "PREÇO UNITÁRIO": 22591.50, "VOLUMETRIA": 0}
+    ],
+    "Manutenções": [
+        {"Serviços": "SEO Otimização (Manutenção SEO)", "MEDIDA": "horas", "CUSTO UN": 0, "PREÇO UNITÁRIO": 214.98, "VOLUMETRIA": 0},
+        {"Serviços": "SEO Implemetação Otimização (Desenvolvimento TECH)", "MEDIDA": "horas", "CUSTO UN": 0, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 0}
+    ]
+}
 
-    Retorne APENAS um dicionário Python no formato:
-    {{
-        "Desenvolvimento": [horas_standard, horas_plus, horas_pro],
-        "Layout / Conteúdo": [horas_standard, horas_plus, horas_pro],
-        "BigQuery": [0 ou 1 para standard, 0 ou 1 para plus, 0 ou 1 para pro],
-        "Projeto de governança": [0 ou 1 para standard, 0 ou 1 para plus, 0 ou 1 para pro],
-        "Modo/Banner de Consentimento": [0 ou 1 para standard, 0 ou 1 para plus, 0 ou 1 para pro]
-    }}
-
-    Seja realista e considere que:
-    - Standard é o pacote básico (40-60 horas desenvolvimento)
-    - Plus inclui mais funcionalidades (60-80 horas)
-    - Pro é o pacote completo (80-120 horas)
-    """
-    
-    try:
-        response = client.models.generate_content(
-                        model="gemini-2.0-flash",
-                        contents=[prompt])
-        if response.text:
-            # Extrai o dicionário da resposta
-            dict_str = response.text.strip().replace('```python', '').replace('```', '').strip()
-            return literal_eval(dict_str)
-    except Exception as e:
-        st.error(f"Erro ao gerar recomendações: {str(e)}")
-        # Retorno padrão em caso de erro
-        return {
-            "Desenvolvimento": [60, 80, 100],
-            "Layout / Conteúdo": [40, 60, 80],
-            "BigQuery": [0, 0, 1],
-            "Projeto de governança": [0, 1, 1],
-            "Modo/Banner de Consentimento": [1, 1, 1]
-        }
-
-# Função para calcular orçamento
-def calcular_orcamento(volumetria, precos):
-    pacotes = ["STANDARD", "PLUS", "PRO"]
+def calcular_orcamento(base_servicos, num_paginas, custom_prices=None):
     resultados = {}
     
-    for i, pacote in enumerate(pacotes):
-        dados = {
-            "CONSTRUÇÃO DE SITE": ["MEDIDA", "PREÇO UNITÁRIO", "VOLUMETRIA DO ATIVO", "VALOR POR PROJETO"],
-            "Desenvolvimento": ["horas", precos["Desenvolvimento"], volumetria["Desenvolvimento"][i], precos["Desenvolvimento"] * volumetria["Desenvolvimento"][i]],
-            "Layout / Conteúdo": ["horas", precos["Layout / Conteúdo"], volumetria["Layout / Conteúdo"][i], precos["Layout / Conteúdo"] * volumetria["Layout / Conteúdo"][i]],
-            "BigQuery": ["projeto", precos["BigQuery"], volumetria["BigQuery"][i], precos["BigQuery"] * volumetria["BigQuery"][i]],
-            "Projeto de governança": ["Projeto", precos["Projeto de governança"], volumetria["Projeto de governança"][i], precos["Projeto de governança"] * volumetria["Projeto de governança"][i]],
-            "Configuração e implementação do Modo/Banner de Consentimento": ["Projeto", precos["Modo/Banner de Consentimento"], volumetria["Modo/Banner de Consentimento"][i], precos["Modo/Banner de Consentimento"] * volumetria["Modo/Banner de Consentimento"][i]],
-            "TOTAL": ["", "", "", sum([
-                precos["Desenvolvimento"] * volumetria["Desenvolvimento"][i],
-                precos["Layout / Conteúdo"] * volumetria["Layout / Conteúdo"][i],
-                precos["BigQuery"] * volumetria["BigQuery"][i],
-                precos["Projeto de governança"] * volumetria["Projeto de governança"][i],
-                precos["Modo/Banner de Consentimento"] * volumetria["Modo/Banner de Consentimento"][i]
-            ])]
-        }
-        resultados[pacote] = pd.DataFrame.from_dict(dados, orient='index')
+    for plano, servicos in base_servicos.items():
+        dados = []
+        total = 0
+        
+        for servico in servicos:
+            # Ajusta volumetria para serviços em horas baseado no número de páginas
+            if servico["MEDIDA"] == "horas":
+                volumetria = servico["VOLUMETRIA"] * (num_paginas / 5)
+            else:
+                volumetria = servico["VOLUMETRIA"]
+            
+            # Verifica se há preço customizado
+            preco_un = custom_prices.get(f"{plano}_{servico['Serviços']}", servico["PREÇO UNITÁRIO"])
+            
+            valor = preco_un * volumetria
+            total += valor
+            
+            dados.append({
+                "PLANO": plano,
+                "Serviços": servico["Serviços"],
+                "MEDIDA": servico["MEDIDA"],
+                "CUSTO UN": f"R$ {servico['CUSTO UN']:,.2f}" if servico['CUSTO UN'] != 0 else "",
+                "PREÇO UNITÁRIO": f"R$ {preco_un:,.2f}",
+                "VOLUMETRIA DO ATIVO": volumetria,
+                "VALOR TOTAL": f"R$ {valor:,.2f}"
+            })
+        
+        # Adicionar linha de total
+        dados.append({
+            "PLANO": "TOTAL",
+            "Serviços": "",
+            "MEDIDA": "",
+            "CUSTO UN": "",
+            "PREÇO UNITÁRIO": "",
+            "VOLUMETRIA DO ATIVO": "",
+            "VALOR TOTAL": f"R$ {total:,.2f}"
+        })
+        
+        resultados[plano] = pd.DataFrame(dados)
     
     return resultados
 
@@ -110,82 +109,98 @@ with st.form("dados_projeto"):
             ["Site Institucional", "E-commerce", "Portal Corporativo", "Aplicativo Web", "Landing Page"]
         )
         
-        complexidade = st.select_slider(
-            "Nível de Complexidade",
-            options=["Baixa", "Média", "Alta", "Muito Alta"]
-        )
+        num_paginas = st.number_input("Número de páginas", min_value=1, max_value=100, value=5, step=1)
     
     with col2:
-        funcionalidades = st.multiselect(
-            "Funcionalidades Principais",
-            ["Blog integrado", "Formulários complexos", "Integração com ERP", "Área de membros", 
-             "Pagamentos online", "Catálogo de produtos", "Multi-idiomas", "Busca avançada"]
-        )
-        
-        st.markdown("**Preços Unitários (R$)**")
-        preco_desenvolvimento = st.number_input("Desenvolvimento (por hora)", value=301.22)
-        preco_layout = st.number_input("Layout/Conteúdo (por hora)", value=170.00)
-        preco_bigquery = st.number_input("BigQuery (por projeto)", value=1200.00)
-        preco_governanca = st.number_input("Projeto de governança", value=8000.00)
-        preco_consentimento = st.number_input("Modo/Banner de Consentimento", value=3000.00)
+        st.markdown("**Serviços Extras**")
+        incluir_dashboard = st.checkbox("Dashboard (Pro)", value=False)
+        incluir_seo_otimizacao = st.checkbox("SEO Otimização (Plus)", value=False)
+    
+    st.header("Personalização de Preços")
+    custom_prices = {}
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("**Standard**")
+        custom_prices["Standard_Layout"] = st.number_input("Preço Layout", value=170.00)
+        custom_prices["Standard_Desenvolvimento"] = st.number_input("Preço Desenvolvimento", value=301.22)
+    
+    with col2:
+        st.markdown("**Plus**")
+        custom_prices["Plus_SEO Planejamento"] = st.number_input("Preço SEO Planejamento", value=18578.72)
+    
+    with col3:
+        st.markdown("**Pro**")
+        custom_prices["Pro_Projeto de governança Digital"] = st.number_input("Preço Governança Digital", value=19646.56)
     
     submitted = st.form_submit_button("Gerar Orçamento")
 
 if submitted:
-    precos = {
-        "Desenvolvimento": preco_desenvolvimento,
-        "Layout / Conteúdo": preco_layout,
-        "BigQuery": preco_bigquery,
-        "Projeto de governança": preco_governanca,
-        "Modo/Banner de Consentimento": preco_consentimento
-    }
+    # Ajustar serviços conforme seleção
+    servicos_base = {k: v.copy() for k, v in SERVICOS_POR_PLANO.items()}
     
-    with st.spinner("Gerando recomendações de volumetria..."):
-        volumetria = gerar_recomendacoes_volumetria(tipo_projeto, complexidade, funcionalidades)
+    if incluir_dashboard:
+        servicos_base["Pro"].extend(SERVICOS_EXTRAS["Extras"])
     
-    st.success("Recomendações geradas com sucesso!")
+    if incluir_seo_otimizacao:
+        servicos_base["Plus"].extend(SERVICOS_EXTRAS["Manutenções"])
     
-    orcamentos = calcular_orcamento(volumetria, precos)
+    orcamentos = calcular_orcamento(servicos_base, num_paginas, custom_prices)
     
-    # Exibir os orçamentos em abas
-    tab1, tab2, tab3 = st.tabs(["STANDARD", "PLUS", "PRO"])
+    # Exibir os orçamentos
+    st.header("Orçamento Detalhado")
     
-    with tab1:
-        st.subheader("Orçamento STANDARD")
-        st.dataframe(orcamentos["STANDARD"].style.format({
-            "PREÇO UNITÁRIO": "R$ {:,.2f}",
-            "VALOR POR PROJETO": "R$ {:,.2f}"
-        }), use_container_width=True)
+    # Juntar todos os DataFrames para exibição
+    df_completo = pd.concat([orcamentos["Standard"], orcamentos["Plus"], orcamentos["Pro"]])
     
-    with tab2:
-        st.subheader("Orçamento PLUS")
-        st.dataframe(orcamentos["PLUS"].style.format({
-            "PREÇO UNITÁRIO": "R$ {:,.2f}",
-            "VALOR POR PROJETO": "R$ {:,.2f}"
-        }), use_container_width=True)
+    # Adicionar linhas vazias para separação visual
+    df_vazio = pd.DataFrame([{"PLANO": "", "Serviços": "", "MEDIDA": "", "CUSTO UN": "", "PREÇO UNITÁRIO": "", "VOLUMETRIA DO ATIVO": "", "VALOR TOTAL": ""}])
+    df_completo = pd.concat([df_completo, df_vazio])
     
-    with tab3:
-        st.subheader("Orçamento PRO")
-        st.dataframe(orcamentos["PRO"].style.format({
-            "PREÇO UNITÁRIO": "R$ {:,.2f}",
-            "VALOR POR PROJETO": "R$ {:,.2f}"
-        }), use_container_width=True)
+    st.dataframe(
+        df_completo,
+        column_config={
+            "CUSTO UN": st.column_config.TextColumn("CUSTO UN"),
+            "PREÇO UNITÁRIO": st.column_config.TextColumn("PREÇO UNITÁRIO"),
+            "VALOR TOTAL": st.column_config.TextColumn("VALOR TOTAL")
+        },
+        hide_index=True,
+        use_container_width=True
+    )
     
     # Botão para download
     @st.cache_data
-    def convert_df_to_csv(df_dict):
-        csv = ""
-        for pacote, df in df_dict.items():
-            csv += f"{pacote}\n\n"
-            csv += df.to_csv(sep='\t')
-            csv += "\n\n"
-        return csv.encode('utf-8')
+    def convert_df_to_excel(df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name="Orçamento")
+        return output.getvalue()
     
-    csv = convert_df_to_csv(orcamentos)
+    excel_data = convert_df_to_excel(df_completo)
     
     st.download_button(
-        label="Baixar Orçamentos como CSV",
-        data=csv,
-        file_name=f"orcamento_{tipo_projeto.lower().replace(' ', '_')}.csv",
-        mime="text/csv"
+        label="Baixar Orçamento (Excel)",
+        data=excel_data,
+        file_name=f"orcamento_{tipo_projeto.lower().replace(' ', '_')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+
+    # Explicação dos planos
+    with st.expander("Detalhes dos Planos"):
+        st.markdown("""
+        **Standard:**
+        - Layout básico
+        - Desenvolvimento essencial
+        - Configurações fundamentais
+        - Hospedagem e domínio
+        
+        **Plus:**
+        - Tudo do Standard
+        - SEO Planejamento
+        - Implementação técnica SEO
+        
+        **Pro:**
+        - Tudo do Plus
+        - Projeto de governança digital
+        - BigQuery (análise de dados)
+        """)

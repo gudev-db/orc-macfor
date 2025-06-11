@@ -98,16 +98,22 @@ with st.form("dados_projeto"):
     
     st.header(f"Serviços do Plano {plano_selecionado}")
     
-    # Obter serviços do plano selecionado
-    servicos_plano = CATALOGO_SERVICOS[plano_selecionado]
+    # Obter serviços do plano selecionado e planos inferiores
+    servicos_disponiveis = CATALOGO_SERVICOS["Standard"].copy()
+    
+    if plano_selecionado in ["Plus", "Pro"]:
+        servicos_disponiveis.extend(CATALOGO_SERVICOS["Plus"])
+    
+    if plano_selecionado == "Pro":
+        servicos_disponiveis.extend(CATALOGO_SERVICOS["Pro"])
     
     # Seleção de serviços
     servicos_selecionados = []
-    for servico in servicos_plano:
+    for servico in servicos_disponiveis:
         col1, col2 = st.columns([3, 1])
         with col1:
             # Serviços obrigatórios são marcados automaticamente e não podem ser desmarcados
-            if servico["Obrigatório"]:
+            if servico.get("Obrigatório", False):
                 st.markdown(f"**{servico['Serviço']}** (Obrigatório)")
                 servicos_selecionados.append(servico)
             else:
@@ -126,7 +132,7 @@ with st.form("dados_projeto"):
     custom_prices = {}
     
     for servico in servicos_selecionados:
-        if not servico["Obrigatório"]:  # Só permite customizar preços de serviços opcionais
+        if not servico.get("Obrigatório", False):  # Só permite customizar preços de serviços opcionais
             preco_padrao = servico["PREÇO UNITÁRIO"]
             novo_preco = st.number_input(
                 f"Preço para {servico['Serviço']}",

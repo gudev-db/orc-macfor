@@ -17,15 +17,15 @@ st.image('static/macLogo.png', width=300)
 st.title("Planejador de Orçamento para Construção de Sites")
 st.markdown("""
     **Sistema automatizado para geração de orçamentos**  
-    Selecione o plano e os serviços desejados para gerar seu orçamento personalizado.
+    Selecione o plano base e adicione os serviços adicionais desejados.
 """)
 
-# Catálogo completo de serviços por plano
-CATALOGO_SERVICOS = {
+# Dados completos baseados na tabela fornecida
+SERVICOS_POR_PLANO = {
     "Standard": [
         {"Serviço": "Layout", "MEDIDA": "horas", "CUSTO UN": 50.00, "PREÇO UNITÁRIO": 170.00, "VOLUMETRIA": 64, "Obrigatório": True},
         {"Serviço": "Desenvolvimento", "MEDIDA": "horas", "CUSTO UN": 187.50, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 64, "Obrigatório": True},
-        {"Serviço": "Configuração do Modo/Banner de Consentimento", "MEDIDA": "Projeto", "CUSTO UN": 1875.00, "PREÇO UNITÁRIO": 3000.00, "VOLUMETRIA": 1, "Obrigatório": True},
+        {"Serviço": "Configuração e implementação do Modo/Banner de Consentimento", "MEDIDA": "Projeto", "CUSTO UN": 1875.00, "PREÇO UNITÁRIO": 3000.00, "VOLUMETRIA": 1, "Obrigatório": True},
         {"Serviço": "Hospedagem", "MEDIDA": "Anual", "CUSTO UN": 100.00, "PREÇO UNITÁRIO": 130.00, "VOLUMETRIA": 0, "Obrigatório": False},
         {"Serviço": "Plugin - ElementorPro", "MEDIDA": "Anual", "CUSTO UN": 39.90, "PREÇO UNITÁRIO": 51.87, "VOLUMETRIA": 1, "Obrigatório": False},
         {"Serviço": "Gestão do Projeto Sr", "MEDIDA": "horas", "CUSTO UN": 0, "PREÇO UNITÁRIO": 320.00, "VOLUMETRIA": 30, "Obrigatório": False},
@@ -34,15 +34,15 @@ CATALOGO_SERVICOS = {
     ],
     "Plus": [
         {"Serviço": "SEO Planejamento", "MEDIDA": "Projeto", "CUSTO UN": 0, "PREÇO UNITÁRIO": 18578.72, "VOLUMETRIA": 1, "Obrigatório": False},
-        {"Serviço": "SEO Implementação (TECH PLAN)", "MEDIDA": "horas", "CUSTO UN": 150.00, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 0, "Obrigatório": False}
+        {"Serviço": "SEO Implementação (Desenvolvimento TECH PLAN)", "MEDIDA": "horas", "CUSTO UN": 150.00, "PREÇO UNITÁRIO": 301.22, "VOLUMETRIA": 0, "Obrigatório": False}
     ],
     "Pro": [
         {"Serviço": "Projeto de governança Digital", "MEDIDA": "Projeto", "CUSTO UN": 0, "PREÇO UNITÁRIO": 19646.56, "VOLUMETRIA": 1, "Obrigatório": False},
-        {"Serviço": "BigQuery", "MEDIDA": "Projeto", "CUSTO UN": 600.00, "PREÇO UNITÁRIO": 1200.00, "VOLUMETRIA": 0, "Obrigatório": False}
+        {"Serviço": "BigQuery (Incluido no custo do proj. de Gov. Digital)", "MEDIDA": "Projeto", "CUSTO UN": 600.00, "PREÇO UNITÁRIO": 1200.00, "VOLUMETRIA": 0, "Obrigatório": False}
     ]
 }
 
-def calcular_orcamento(plano, servicos_selecionados, num_paginas, custom_prices=None):
+def calcular_orcamento(servicos_selecionados, num_paginas, custom_prices=None):
     dados = []
     total = 0
     
@@ -54,19 +54,19 @@ def calcular_orcamento(plano, servicos_selecionados, num_paginas, custom_prices=
             volumetria = servico["VOLUMETRIA"]
         
         # Verifica se há preço customizado
-        preco_key = f"{plano}_{servico['Serviço']}"
+        preco_key = f"{servico['Serviço']}"
         preco_un = custom_prices.get(preco_key, servico["PREÇO UNITÁRIO"])
         
         valor = preco_un * volumetria
         total += valor
         
         dados.append({
-            "PLANO": plano,
+            "PLANO": servico.get("Plano", "Standard"),
             "Serviços": servico["Serviço"],
             "MEDIDA": servico["MEDIDA"],
             "CUSTO UN": f"R$ {servico['CUSTO UN']:,.2f}" if servico['CUSTO UN'] != 0 else "",
             "PREÇO UNITÁRIO": f"R$ {preco_un:,.2f}",
-            "VOLUMETRIA DO ATIVO": f"{volumetria:,.2f}" if isinstance(volumetria, float) else f"{volumetria}",
+            "VOLUMETRIA DO ATIVO": volumetria,
             "VALOR TOTAL": f"R$ {valor:,.2f}"
         })
     
@@ -85,44 +85,51 @@ def calcular_orcamento(plano, servicos_selecionados, num_paginas, custom_prices=
 
 # Interface do usuário
 with st.form("dados_projeto"):
-    st.header("Selecione seu Plano")
-    
-    # Seleção do plano
-    plano_selecionado = st.radio(
-        "Escolha o plano desejado:",
+    st.header("Selecione o Plano Base")
+    plano_base = st.radio(
+        "Plano Base:",
         options=["Standard", "Plus", "Pro"],
         horizontal=True
     )
     
-    st.header(f"Serviços do Plano {plano_selecionado}")
+    st.header("Serviços do Plano Standard")
+    st.markdown("Todos os serviços abaixo estão incluídos no plano Standard:")
     
-    # Obter serviços do plano selecionado
-    servicos_plano = CATALOGO_SERVICOS["Standard"].copy()
+    # Serviços Standard (sempre incluídos)
+    servicos_standard = [s for s in SERVICOS_POR_PLANO["Standard"] if s["Obrigatório"]]
+    servicos_selecionados = servicos_standard.copy()
     
-    # Adicionar serviços Plus se o plano for Plus ou Pro
-    if plano_selecionado in ["Plus", "Pro"]:
-        servicos_plano.extend(CATALOGO_SERVICOS["Plus"])
+    # Mostrar serviços Standard obrigatórios
+    for servico in servicos_standard:
+        st.markdown(f"✓ **{servico['Serviço']}** - {servico['MEDIDA']} - R$ {servico['PREÇO UNITÁRIO']:,.2f}")
     
-    # Adicionar serviços Pro se o plano for Pro
-    if plano_selecionado == "Pro":
-        servicos_plano.extend(CATALOGO_SERVICOS["Pro"])
+    # Serviços Standard opcionais
+    st.markdown("**Opcionais:**")
+    for servico in [s for s in SERVICOS_POR_PLANO["Standard"] if not s["Obrigatório"]]:
+        if st.checkbox(f"{servico['Serviço']} (+R$ {servico['PREÇO UNITÁRIO']:,.2f})", key=f"std_{servico['Serviço']}"):
+            servicos_selecionados.append(servico)
     
-    # Seleção de serviços
-    servicos_selecionados = []
-    for servico in servicos_plano:
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            # Serviços obrigatórios são marcados automaticamente e não podem ser desmarcados
-            if servico.get("Obrigatório", False):
-                st.markdown(f"**{servico['Serviço']}** (Obrigatório)")
-                servicos_selecionados.append(servico)
-            else:
-                # Para serviços não obrigatórios, mostrar checkbox
-                if st.checkbox(servico["Serviço"], value=False, key=f"{plano_selecionado}_{servico['Serviço']}"):
-                    servicos_selecionados.append(servico)
+    # Serviços Plus (se selecionado Plus ou Pro como plano base)
+    if plano_base in ["Plus", "Pro"]:
+        st.header("Serviços Adicionais do Plano Plus")
+        st.markdown("Selecione os serviços Plus que deseja incluir:")
         
-        with col2:
-            st.markdown(f"*Preço: R$ {servico['PREÇO UNITÁRIO']:,.2f}*")
+        for servico in SERVICOS_POR_PLANO["Plus"]:
+            if st.checkbox(f"{servico['Serviço']} (+R$ {servico['PREÇO UNITÁRIO']:,.2f})", key=f"plus_{servico['Serviço']}"):
+                servico_com_plano = servico.copy()
+                servico_com_plano["Plano"] = "Plus"
+                servicos_selecionados.append(servico_com_plano)
+    
+    # Serviços Pro (se selecionado Pro como plano base)
+    if plano_base == "Pro":
+        st.header("Serviços Adicionais do Plano Pro")
+        st.markdown("Selecione os serviços Pro que deseja incluir:")
+        
+        for servico in SERVICOS_POR_PLANO["Pro"]:
+            if st.checkbox(f"{servico['Serviço']} (+R$ {servico['PREÇO UNITÁRIO']:,.2f})", key=f"pro_{servico['Serviço']}"):
+                servico_com_plano = servico.copy()
+                servico_com_plano["Plano"] = "Pro"
+                servicos_selecionados.append(servico_com_plano)
     
     # Configurações adicionais
     st.header("Configurações do Projeto")
@@ -132,26 +139,25 @@ with st.form("dados_projeto"):
     st.header("Personalização de Preços")
     custom_prices = {}
     
+    # Permitir editar preços dos serviços selecionados
     for servico in servicos_selecionados:
-        if not servico.get("Obrigatório", False):  # Só permite customizar preços de serviços opcionais
-            preco_padrao = servico["PREÇO UNITÁRIO"]
+        if not servico["Obrigatório"]:  # Só permite customizar preços de serviços opcionais
             novo_preco = st.number_input(
                 f"Preço para {servico['Serviço']}",
                 min_value=0.0,
-                value=preco_padrao,
+                value=float(servico["PREÇO UNITÁRIO"]),
                 step=0.01,
                 key=f"preco_{servico['Serviço']}"
             )
-            custom_prices[f"{plano_selecionado}_{servico['Serviço']}"] = novo_preco
+            custom_prices[servico["Serviço"]] = novo_preco
     
     submitted = st.form_submit_button("Gerar Orçamento")
 
 if submitted and servicos_selecionados:
-    orcamento = calcular_orcamento(plano_selecionado, servicos_selecionados, num_paginas, custom_prices)
+    orcamento = calcular_orçamento(servicos_selecionados, num_paginas, custom_prices)
     
     # Exibir o orçamento
-    st.header(f"Orçamento - Plano {plano_selecionado}")
-    
+    st.header("Orçamento Detalhado")
     st.dataframe(
         orcamento,
         column_config={
@@ -176,7 +182,7 @@ if submitted and servicos_selecionados:
     st.download_button(
         label="Baixar Orçamento (Excel)",
         data=excel_data,
-        file_name=f"orcamento_{plano_selecionado}.xlsx",
+        file_name=f"orcamento_{plano_base}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
@@ -184,21 +190,18 @@ elif submitted:
     st.warning("Por favor, selecione pelo menos um serviço para gerar o orçamento.")
 
 # Descrição dos planos
-with st.expander("ℹ️ Sobre os Planos"):
+with st.expander("ℹ️ Informações sobre os Planos"):
     st.markdown("""
-    **Standard** - Ideal para sites institucionais básicos:
-    - Layout e desenvolvimento essencial
-    - Configurações fundamentais
-    - Opcionais: Hospedagem, domínio, gestão de projeto
+    **Standard** - Serviços básicos para construção de sites:
+    - Layout e desenvolvimento (obrigatórios)
+    - Configuração de consentimento (obrigatório)
+    - Hospedagem, domínio e gestão (opcionais)
 
-    **Plus** - Para sites com necessidades de SEO:
-    - Tudo do Standard
-    - Serviços especializados em SEO
-    - Otimização para mecanismos de busca
+    **Plus** - Adiciona ao Standard:
+    - SEO Planejamento
+    - Implementação técnica SEO
 
-    **Pro** - Solução completa para grandes projetos:
-    - Tudo do Plus
-    - Governança digital
+    **Pro** - Adiciona ao Plus:
+    - Projeto de governança digital
     - BigQuery para análise de dados
-    - Dashboards personalizados
     """)
